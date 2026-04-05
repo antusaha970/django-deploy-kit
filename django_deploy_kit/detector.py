@@ -534,9 +534,16 @@ class ProjectDetector:
                 match = re.match(pattern_posix, line.strip())
                 if match:
                     return match.group(1)
+            logger.debug("---- DJANGO SETTING DEBUG START ----")
+            logger.debug("manage.py path: %s", manage_py)
+            logger.debug("project_path: %s", project_path)
+            logger.debug("python_path used: %s", python_path)
+            logger.debug("VIRTUAL_ENV: %s", os.environ.get("VIRTUAL_ENV"))
+            logger.debug("sys.executable: %s", sys.executable)
+            logger.debug("---- DJANGO SETTING DEBUG END ----")
 
         except (subprocess.SubprocessError, OSError):
-            pass
+            logger.debug("in except block")
 
         return None
 

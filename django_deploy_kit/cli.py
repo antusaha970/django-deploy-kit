@@ -1,5 +1,6 @@
 """Click-based CLI for django-deploy-kit."""
 
+import logging
 import os
 import sys
 
@@ -53,6 +54,15 @@ console = Console()
 @click.pass_context
 def main(ctx, project_path, project_name, no_confirm, verbose):
     """django-deploy-kit: Auto-generate Gunicorn & Nginx configs for Django projects."""
+    # Configure logging based on --verbose flag
+    log_level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s [%(name)s] %(message)s",
+    )
+    # Also ensure our package logger respects the level
+    logging.getLogger("django_deploy_kit").setLevel(log_level)
+
     check_platform()
 
     ctx.ensure_object(dict)
