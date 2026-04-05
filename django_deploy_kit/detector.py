@@ -506,7 +506,7 @@ class ProjectDetector:
         if not os.path.isfile(manage_py):
             return None
 
-        python_path = sys.executable
+        python_path = self.detect_python_path() or sys.executable
 
         try:
             result = subprocess.run(
