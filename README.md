@@ -43,7 +43,7 @@ cd /path/to/your/django/project
 source venv/bin/activate
 
 # Run the setup
-sudo django-deploy setup
+django-deploy setup
 ```
 
 That's it. The tool will:
