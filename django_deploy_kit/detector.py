@@ -33,6 +33,7 @@ class ProjectDetector:
         self._project_path = project_path
         self._manage_py_path = None
         self._settings_module = None
+        self._detected_python_path = None
 
     def detect_all(self):
         """Run all detection methods and return a dict of results.
@@ -235,10 +236,10 @@ class ProjectDetector:
             venv_dir: Path to the candidate virtualenv directory.
 
         Returns:
-            str or None: The resolved python executable path if valid,
+            str or None: The venv python executable path if valid,
                          None otherwise.
         """
-        venv_dir = os.path.realpath(venv_dir)
+        venv_dir = os.path.abspath(venv_dir)
         pyvenv_cfg = os.path.join(venv_dir, "pyvenv.cfg")
         python_bin = os.path.join(venv_dir, "bin", "python")
 
@@ -247,7 +248,11 @@ class ProjectDetector:
         if not ProjectDetector._is_valid_executable(python_bin):
             return None
 
-        return os.path.realpath(python_bin)
+        # Return the venv path, NOT os.path.realpath().
+        # realpath resolves symlinks to the system Python binary
+        # (e.g. /usr/bin/python3.12), which bypasses the venv's
+        # site-packages entirely.
+        return python_bin
 
     def _search_upward_for_venv(self, start_path):
         """Search upward from start_path to root for a virtualenv directory.
@@ -357,40 +362,37 @@ class ProjectDetector:
         Returns:
             str (resolved python executable path) or None
         """
-        project_path = os.path.realpath(
+        project_path = os.path.abspath(
             self._project_path or os.getcwd()
         )
 
         # --- Strategy 1: Interpreter state (highest confidence) ---
+        # If the current process IS running inside a venv, trust it.
         if sys.prefix != sys.base_prefix:
             exe = sys.executable
-            resolved = os.path.realpath(exe)
-
-            # 🚨 CRITICAL FIX: ensure it's actually inside a venv
-            if exe and self._is_valid_executable(exe) and "bin/python" in resolved:
+            if exe and self._is_valid_executable(exe):
+                # Use abspath (NOT realpath!) — realpath follows symlinks
+                # to the system Python, which would bypass the venv.
+                result = os.path.abspath(exe)
                 logger.debug(
-                    "Strategy 1 (interpreter state): using sys.executable = %s",
-                    resolved,
+                    "Strategy 1 (interpreter state): running inside "
+                    "virtualenv, using sys.executable = %s",
+                    result,
                 )
-                return resolved
-            else:
-                logger.debug(
-                    "Strategy 1 rejected: sys.executable=%s is not a venv python",
-                    resolved,
-                )
+                return result
 
         # --- Strategy 2: VIRTUAL_ENV environment variable ---
         virtual_env = os.environ.get("VIRTUAL_ENV")
         if virtual_env:
             candidate = os.path.join(virtual_env, "bin", "python")
             if self._is_valid_executable(candidate):
-                resolved = os.path.realpath(candidate)
+                result = os.path.abspath(candidate)
                 logger.debug(
                     "Strategy 2 (VIRTUAL_ENV env var): found python "
                     "at %s",
-                    resolved,
+                    result,
                 )
-                return resolved
+                return result
             else:
                 logger.debug(
                     "Strategy 2 (VIRTUAL_ENV env var): VIRTUAL_ENV=%s "
@@ -512,7 +514,20 @@ class ProjectDetector:
         if not os.path.isfile(manage_py):
             return None
 
-        python_path = self.detect_python_path() or sys.executable
+        # Use cached result if available to avoid re-detection
+        if self._detected_python_path is not None:
+            python_path = self._detected_python_path
+        else:
+            python_path = self.detect_python_path()
+            self._detected_python_path = python_path
+
+        if not python_path:
+            python_path = sys.executable
+            logger.debug(
+                "_get_django_setting: no venv python found, "
+                "falling back to sys.executable=%s",
+                python_path,
+            )
 
         try:
             result = subprocess.run(
