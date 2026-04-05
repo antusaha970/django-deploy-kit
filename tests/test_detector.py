@@ -1,7 +1,6 @@
 """Tests for the ProjectDetector class."""
 
 import os
-import socket
 import sys
 from unittest import mock
 
@@ -404,27 +403,42 @@ class TestDetectPythonPath:
 
 
 class TestDetectServerIp:
-    """Tests for server IP detection."""
+    """Tests for server IP detection via ipify API."""
 
-    def test_returns_string(self):
+    @mock.patch("django_deploy_kit.detector.urllib.request.urlopen")
+    def test_returns_ip_from_ipify(self, mock_urlopen):
+        """Successful ipify response returns the IP."""
+        mock_resp = mock.MagicMock()
+        mock_resp.read.return_value = b'{"ip": "203.0.113.42"}'
+        mock_resp.__enter__ = mock.Mock(return_value=mock_resp)
+        mock_resp.__exit__ = mock.Mock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
         detector = ProjectDetector()
         ip = detector.detect_server_ip()
-        assert isinstance(ip, str)
-        assert len(ip) > 0
+        assert ip == "203.0.113.42"
 
-    @mock.patch("django_deploy_kit.detector.socket.gethostbyname", side_effect=socket.error)
-    @mock.patch("django_deploy_kit.detector.socket.gethostname", return_value="localhost")
-    @mock.patch("django_deploy_kit.detector.socket.socket")
-    def test_fallback_to_underscore(self, mock_socket_cls, mock_hostname, mock_gethostbyname):
-        # Make /etc/hosts unreadable and UDP socket fail
-        mock_sock = mock.MagicMock()
-        mock_sock.getsockname.return_value = ("127.0.0.1", 0)
-        mock_socket_cls.return_value = mock_sock
+    @mock.patch(
+        "django_deploy_kit.detector.urllib.request.urlopen",
+        side_effect=OSError("no network"),
+    )
+    def test_fallback_to_underscore_on_error(self, mock_urlopen):
+        """When ipify request fails, return '_'."""
+        detector = ProjectDetector()
+        ip = detector.detect_server_ip()
+        assert ip == "_"
+
+    @mock.patch("django_deploy_kit.detector.urllib.request.urlopen")
+    def test_fallback_on_bad_json(self, mock_urlopen):
+        """When ipify returns invalid JSON, return '_'."""
+        mock_resp = mock.MagicMock()
+        mock_resp.read.return_value = b"not json"
+        mock_resp.__enter__ = mock.Mock(return_value=mock_resp)
+        mock_resp.__exit__ = mock.Mock(return_value=False)
+        mock_urlopen.return_value = mock_resp
 
         detector = ProjectDetector()
-        with mock.patch("builtins.open", side_effect=IOError):
-            ip = detector.detect_server_ip()
-        # All methods return loopback or fail, so should get "_"
+        ip = detector.detect_server_ip()
         assert ip == "_"
 
 

@@ -187,6 +187,19 @@ def setup(ctx, dry_run, verbose):
                 "No changes were made.[/bold yellow]\n"
             )
 
+        # Always remind the user to update server_name
+        server_ip = config.get("server_ip", "_")
+        nginx_path = f"/etc/nginx/sites-available/{config['project_name']}"
+        console.print(
+            f"[bold cyan]📌 Important:[/bold cyan] Your Nginx [bold]server_name[/bold] "
+            f"is currently set to [yellow]{server_ip}[/yellow].\n"
+            f"   If you have a domain name, update it in the Nginx config:\n\n"
+            f"     [dim]sudo nano {nginx_path}[/dim]\n\n"
+            f"   Change [yellow]server_name {server_ip};[/yellow] → "
+            f"[green]server_name yourdomain.com;[/green]\n"
+            f"   Then reload Nginx: [dim]sudo systemctl reload nginx[/dim]\n"
+        )
+
 
 @main.command()
 @click.option(

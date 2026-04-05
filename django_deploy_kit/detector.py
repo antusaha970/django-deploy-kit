@@ -1,13 +1,15 @@
 """Auto-detection logic for Django project configuration."""
 
 import grp
+import json
 import logging
 import os
 import pwd
 import re
-import socket
 import subprocess
 import sys
+import urllib.request
+import urllib.error
 
 import psutil
 
@@ -432,54 +434,42 @@ class ProjectDetector:
         return sys.prefix != sys.base_prefix
 
     def detect_server_ip(self):
-        """Detect the server's IP address.
+        """Detect the server's public IP address.
 
-        Tries in order:
-        1. Parse /etc/hosts for a non-loopback entry
-        2. socket.gethostbyname(socket.gethostname())
-        3. UDP socket trick to 8.8.8.8
-
-        Falls back to '_' (Nginx catch-all) if all fail.
+        Queries https://api.ipify.org/?format=json to get the public
+        IPv4 address. Falls back to '_' (Nginx catch-all) if the
+        request fails for any reason.
 
         Returns:
-            str
+            str: Public IPv4 address, or '_' on failure.
         """
-        # Method 1: Parse /etc/hosts
         try:
-            with open("/etc/hosts", "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        ip = parts[0]
-                        if ip not in ("127.0.0.1", "::1", "127.0.1.1"):
-                            return ip
-        except (IOError, OSError):
-            pass
-
-        # Method 2: gethostbyname
-        try:
-            ip = socket.gethostbyname(socket.gethostname())
-            if ip and not ip.startswith("127."):
-                return ip
-        except socket.error:
-            pass
-
-        # Method 3: UDP socket trick
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(2)
-            sock.connect(("8.8.8.8", 80))
-            ip = sock.getsockname()[0]
-            sock.close()
-            if ip and not ip.startswith("127."):
-                return ip
-        except (socket.error, OSError):
-            pass
+            req = urllib.request.Request(
+                "https://api.ipify.org/?format=json",
+                headers={"Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                ip = data.get("ip", "").strip()
+                if ip:
+                    logger.debug(
+                        "detect_server_ip: got public IP from ipify = %s",
+                        ip,
+                    )
+                    return ip
+        except (urllib.error.URLError, OSError, json.JSONDecodeError,
+                ValueError, KeyError) as exc:
+            logger.debug(
+                "detect_server_ip: ipify request failed (%s), "
+                "falling back to '_'",
+                exc,
+            )
 
         # Fallback
+        logger.debug(
+            "detect_server_ip: could not determine public IP, "
+            "using '_' (Nginx catch-all)"
+        )
         return "_"
 
     def detect_workers(self):
