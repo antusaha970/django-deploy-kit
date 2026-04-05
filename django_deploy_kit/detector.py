@@ -364,14 +364,20 @@ class ProjectDetector:
         # --- Strategy 1: Interpreter state (highest confidence) ---
         if sys.prefix != sys.base_prefix:
             exe = sys.executable
-            if exe and self._is_valid_executable(exe):
-                resolved = os.path.realpath(exe)
+            resolved = os.path.realpath(exe)
+
+            # 🚨 CRITICAL FIX: ensure it's actually inside a venv
+            if exe and self._is_valid_executable(exe) and "bin/python" in resolved:
                 logger.debug(
-                    "Strategy 1 (interpreter state): running inside "
-                    "virtualenv, using sys.executable = %s",
+                    "Strategy 1 (interpreter state): using sys.executable = %s",
                     resolved,
                 )
                 return resolved
+            else:
+                logger.debug(
+                    "Strategy 1 rejected: sys.executable=%s is not a venv python",
+                    resolved,
+                )
 
         # --- Strategy 2: VIRTUAL_ENV environment variable ---
         virtual_env = os.environ.get("VIRTUAL_ENV")
