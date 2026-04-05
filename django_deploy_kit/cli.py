@@ -26,6 +26,17 @@ from .validators import ConfigValidator
 console = Console()
 
 
+def _configure_logging(verbose):
+    """Set up logging level based on the verbose flag."""
+    log_level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s [%(name)s] %(message)s",
+        force=True,
+    )
+    logging.getLogger("django_deploy_kit").setLevel(log_level)
+
+
 @click.group(invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="django-deploy-kit")
 @click.option(
@@ -54,15 +65,7 @@ console = Console()
 @click.pass_context
 def main(ctx, project_path, project_name, no_confirm, verbose):
     """django-deploy-kit: Auto-generate Gunicorn & Nginx configs for Django projects."""
-    # Configure logging based on --verbose flag
-    log_level = logging.DEBUG if verbose else logging.WARNING
-    logging.basicConfig(
-        level=log_level,
-        format="%(levelname)s [%(name)s] %(message)s",
-    )
-    # Also ensure our package logger respects the level
-    logging.getLogger("django_deploy_kit").setLevel(log_level)
-
+    _configure_logging(verbose)
     check_platform()
 
     ctx.ensure_object(dict)
@@ -83,13 +86,19 @@ def main(ctx, project_path, project_name, no_confirm, verbose):
     default=False,
     help="Show what would be done without actually doing it.",
 )
+@click.option(
+    "--verbose/--no-verbose",
+    default=False,
+    help="Show or hide detailed output.",
+)
 @click.pass_context
-def setup(ctx, dry_run):
+def setup(ctx, dry_run, verbose):
     """Full interactive setup: detect, validate, generate, and install."""
+    verbose = verbose or ctx.obj.get("verbose", False)
+    _configure_logging(verbose)
     project_path = ctx.obj["project_path"]
     project_name = ctx.obj["project_name"]
     no_confirm = ctx.obj["no_confirm"]
-    verbose = ctx.obj["verbose"]
 
     console.print(
         "\n[bold cyan]🚀 django-deploy-kit — Setup[/bold cyan]\n"
@@ -180,11 +189,17 @@ def setup(ctx, dry_run):
 
 
 @main.command()
+@click.option(
+    "--verbose/--no-verbose",
+    default=False,
+    help="Show or hide detailed output.",
+)
 @click.pass_context
-def detect(ctx):
+def detect(ctx, verbose):
     """Run detection only and print results without installing."""
+    verbose = verbose or ctx.obj.get("verbose", False)
+    _configure_logging(verbose)
     project_path = ctx.obj["project_path"]
-    verbose = ctx.obj["verbose"]
 
     console.print(
         "\n[bold cyan]🔍 django-deploy-kit — Detection[/bold cyan]\n"
@@ -209,9 +224,16 @@ def detect(ctx):
     default=".",
     help="Directory to write generated files to.",
 )
+@click.option(
+    "--verbose/--no-verbose",
+    default=False,
+    help="Show or hide detailed output.",
+)
 @click.pass_context
-def generate(ctx, output_dir):
+def generate(ctx, output_dir, verbose):
     """Generate config files to the current directory without installing."""
+    verbose = verbose or ctx.obj.get("verbose", False)
+    _configure_logging(verbose)
     project_path = ctx.obj["project_path"]
     project_name = ctx.obj["project_name"]
     no_confirm = ctx.obj["no_confirm"]
