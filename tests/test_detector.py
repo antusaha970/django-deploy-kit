@@ -151,14 +151,256 @@ class TestDetectGroup:
         assert isinstance(group, str)
 
 
-class TestDetectPythonPath:
-    """Tests for Python path detection."""
+class TestIsValidExecutable:
+    """Tests for _is_valid_executable helper."""
 
-    def test_returns_current_python(self):
-        detector = ProjectDetector()
-        python_path = detector.detect_python_path()
-        assert python_path is not None
-        assert os.path.isfile(python_path)
+    def test_valid_executable(self, tmp_path):
+        exe = tmp_path / "python"
+        exe.write_text("#!/bin/sh\n")
+        exe.chmod(0o755)
+        assert ProjectDetector._is_valid_executable(str(exe)) is True
+
+    def test_nonexistent_path(self):
+        assert ProjectDetector._is_valid_executable("/no/such/file") is False
+
+    def test_not_executable(self, tmp_path):
+        f = tmp_path / "python"
+        f.write_text("not executable")
+        f.chmod(0o644)
+        assert ProjectDetector._is_valid_executable(str(f)) is False
+
+    def test_directory_not_file(self, tmp_path):
+        d = tmp_path / "python"
+        d.mkdir()
+        assert ProjectDetector._is_valid_executable(str(d)) is False
+
+
+class TestIsValidVirtualenv:
+    """Tests for _is_valid_virtualenv helper."""
+
+    def _make_venv(self, path):
+        """Create a minimal valid virtualenv structure at path."""
+        path.mkdir(exist_ok=True)
+        (path / "pyvenv.cfg").write_text("home = /usr/bin\n")
+        bin_dir = path / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        python = bin_dir / "python"
+        python.write_text("#!/bin/sh\n")
+        python.chmod(0o755)
+
+    def test_valid_virtualenv(self, tmp_path):
+        venv = tmp_path / ".venv"
+        self._make_venv(venv)
+        result = ProjectDetector._is_valid_virtualenv(str(venv))
+        assert result is not None
+        assert result.endswith("python")
+
+    def test_missing_pyvenv_cfg(self, tmp_path):
+        venv = tmp_path / ".venv"
+        venv.mkdir()
+        bin_dir = venv / "bin"
+        bin_dir.mkdir()
+        python = bin_dir / "python"
+        python.write_text("#!/bin/sh\n")
+        python.chmod(0o755)
+        # No pyvenv.cfg → invalid
+        assert ProjectDetector._is_valid_virtualenv(str(venv)) is None
+
+    def test_missing_python_binary(self, tmp_path):
+        venv = tmp_path / ".venv"
+        venv.mkdir()
+        (venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
+        # No bin/python → invalid
+        assert ProjectDetector._is_valid_virtualenv(str(venv)) is None
+
+    def test_nonexecutable_python(self, tmp_path):
+        venv = tmp_path / ".venv"
+        venv.mkdir()
+        (venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
+        bin_dir = venv / "bin"
+        bin_dir.mkdir()
+        python = bin_dir / "python"
+        python.write_text("not executable")
+        python.chmod(0o644)
+        assert ProjectDetector._is_valid_virtualenv(str(venv)) is None
+
+
+class TestDetectPythonPath:
+    """Tests for Python path detection (multi-strategy)."""
+
+    def _make_venv(self, path):
+        """Create a minimal valid virtualenv structure at path."""
+        path.mkdir(exist_ok=True)
+        (path / "pyvenv.cfg").write_text("home = /usr/bin\n")
+        bin_dir = path / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        python = bin_dir / "python"
+        python.write_text("#!/bin/sh\n")
+        python.chmod(0o755)
+
+    # --- Strategy 1: Interpreter state ---
+
+    def test_strategy1_inside_virtualenv(self, tmp_path):
+        """When running inside a virtualenv, sys.executable is returned."""
+        detector = ProjectDetector(project_path=str(tmp_path))
+        fake_exe = tmp_path / "fake_python"
+        fake_exe.write_text("#!/bin/sh\n")
+        fake_exe.chmod(0o755)
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/some/venv"
+            mock_sys.base_prefix = "/usr"
+            mock_sys.executable = str(fake_exe)
+            result = detector.detect_python_path()
+        assert result == os.path.realpath(str(fake_exe))
+
+    def test_strategy1_not_in_virtualenv_skips(self, tmp_path):
+        """When NOT inside a virtualenv, strategy 1 is skipped."""
+        detector = ProjectDetector(project_path=str(tmp_path))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            mock_sys.executable = "/usr/bin/python3"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        # Falls through to filesystem search, nothing in tmp_path → None
+        assert result is None
+
+    # --- Strategy 2: VIRTUAL_ENV env var ---
+
+    def test_strategy2_virtual_env_var(self, tmp_path):
+        """VIRTUAL_ENV env var points to a valid venv."""
+        venv = tmp_path / "myvenv"
+        self._make_venv(venv)
+
+        detector = ProjectDetector(project_path=str(tmp_path))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(
+                os.environ, {"VIRTUAL_ENV": str(venv)}, clear=False
+            ):
+                result = detector.detect_python_path()
+        expected = os.path.realpath(str(venv / "bin" / "python"))
+        assert result == expected
+
+    def test_strategy2_invalid_virtual_env(self, tmp_path):
+        """VIRTUAL_ENV set but points to broken path — falls through."""
+        detector = ProjectDetector(project_path=str(tmp_path))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(
+                os.environ, {"VIRTUAL_ENV": "/nonexistent/venv"}, clear=False
+            ):
+                result = detector.detect_python_path()
+        assert result is None
+
+    # --- Strategy 3: Upward search ---
+
+    def test_strategy3_upward_search_project_level(self, tmp_path):
+        """Venv directory at the project root level."""
+        venv = tmp_path / ".venv"
+        self._make_venv(venv)
+
+        detector = ProjectDetector(project_path=str(tmp_path))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        expected = os.path.realpath(str(venv / "bin" / "python"))
+        assert result == expected
+
+    def test_strategy3_upward_search_parent_level(self, tmp_path):
+        """Venv directory one level above the project."""
+        venv = tmp_path / "venv"
+        self._make_venv(venv)
+        sub = tmp_path / "project"
+        sub.mkdir()
+
+        detector = ProjectDetector(project_path=str(sub))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        expected = os.path.realpath(str(venv / "bin" / "python"))
+        assert result == expected
+
+    def test_strategy3_prefers_closest_venv(self, tmp_path):
+        """When multiple venvs exist, upward search returns closest."""
+        # Parent venv
+        parent_venv = tmp_path / ".venv"
+        self._make_venv(parent_venv)
+        # Project-level venv (closer)
+        project = tmp_path / "project"
+        project.mkdir()
+        project_venv = project / ".venv"
+        self._make_venv(project_venv)
+
+        detector = ProjectDetector(project_path=str(project))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        expected = os.path.realpath(str(project_venv / "bin" / "python"))
+        assert result == expected
+
+    # --- Strategy 4: Downward search ---
+
+    def test_strategy4_downward_search(self, tmp_path):
+        """Venv in a subdirectory found by downward search."""
+        sub = tmp_path / "subdir"
+        sub.mkdir()
+        venv = sub / ".venv"
+        self._make_venv(venv)
+
+        # Use a project path that has NO venv at its own level or above
+        project = tmp_path / "project"
+        project.mkdir()
+        # Place the venv inside the project subdirectory
+        inner = project / "inner"
+        inner.mkdir()
+        inner_venv = inner / "venv"
+        self._make_venv(inner_venv)
+
+        detector = ProjectDetector(project_path=str(project))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        expected = os.path.realpath(str(inner_venv / "bin" / "python"))
+        assert result == expected
+
+    # --- No venv found ---
+
+    def test_no_venv_returns_none(self, tmp_path):
+        """When no virtualenv exists anywhere, return None."""
+        detector = ProjectDetector(project_path=str(tmp_path))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        assert result is None
+
+    # --- Broken venv skipped ---
+
+    def test_broken_venv_skipped(self, tmp_path):
+        """A directory named 'venv' without pyvenv.cfg is ignored."""
+        broken = tmp_path / "venv"
+        broken.mkdir()
+        # No pyvenv.cfg, no bin/python
+
+        detector = ProjectDetector(project_path=str(tmp_path))
+        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+            mock_sys.prefix = "/usr"
+            mock_sys.base_prefix = "/usr"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                result = detector.detect_python_path()
+        assert result is None
 
 
 class TestDetectServerIp:

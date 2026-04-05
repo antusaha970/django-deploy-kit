@@ -1,6 +1,7 @@
 """Auto-detection logic for Django project configuration."""
 
 import grp
+import logging
 import os
 import pwd
 import re
@@ -11,6 +12,14 @@ import sys
 import psutil
 
 from .utils import sanitize_project_name
+
+logger = logging.getLogger(__name__)
+
+# Well-known virtualenv directory names to search for
+_VENV_DIR_NAMES = [".venv", "venv", "env", ".env"]
+
+# Maximum depth for downward directory search to avoid deep recursion
+_MAX_DOWNWARD_DEPTH = 3
 
 
 class ProjectDetector:
@@ -199,18 +208,216 @@ class ProjectDetector:
         except (KeyError, OSError):
             return None
 
+    @staticmethod
+    def _is_valid_executable(path):
+        """Check if a path points to a valid, executable file.
+
+        Args:
+            path: Filesystem path to check.
+
+        Returns:
+            bool: True if path exists, is a file, and is executable.
+        """
+        resolved = os.path.realpath(path)
+        return (
+            os.path.isfile(resolved) and os.access(resolved, os.X_OK)
+        )
+
+    @staticmethod
+    def _is_valid_virtualenv(venv_dir):
+        """Validate that a directory is a genuine virtualenv.
+
+        A valid virtualenv MUST contain:
+          - pyvenv.cfg at the root
+          - bin/python as an executable file
+
+        Args:
+            venv_dir: Path to the candidate virtualenv directory.
+
+        Returns:
+            str or None: The resolved python executable path if valid,
+                         None otherwise.
+        """
+        venv_dir = os.path.realpath(venv_dir)
+        pyvenv_cfg = os.path.join(venv_dir, "pyvenv.cfg")
+        python_bin = os.path.join(venv_dir, "bin", "python")
+
+        if not os.path.isfile(pyvenv_cfg):
+            return None
+        if not ProjectDetector._is_valid_executable(python_bin):
+            return None
+
+        return os.path.realpath(python_bin)
+
+    def _search_upward_for_venv(self, start_path):
+        """Search upward from start_path to root for a virtualenv directory.
+
+        At each level, checks for well-known virtualenv directory names
+        (.venv, venv, env, .env) and validates them.
+
+        The first valid virtualenv found (closest to project) wins.
+
+        Args:
+            start_path: Absolute path to start searching from.
+
+        Returns:
+            str or None: Resolved python executable path, or None.
+        """
+        current = os.path.realpath(start_path)
+        visited = set()
+
+        while current and current not in visited:
+            visited.add(current)
+            for name in _VENV_DIR_NAMES:
+                candidate = os.path.join(current, name)
+                if os.path.isdir(candidate):
+                    python_path = self._is_valid_virtualenv(candidate)
+                    if python_path:
+                        logger.debug(
+                            "Upward search: found virtualenv at %s",
+                            candidate,
+                        )
+                        return python_path
+
+            parent = os.path.dirname(current)
+            if parent == current:
+                break  # Reached filesystem root
+            current = parent
+
+        return None
+
+    def _search_downward_for_venv(self, start_path, max_depth=None):
+        """Walk project directory downward looking for a virtualenv.
+
+        Limits depth to avoid deep recursive scans. Returns the
+        shallowest (nearest) valid virtualenv found.
+
+        Args:
+            start_path: Absolute path to start searching from.
+            max_depth: Maximum directory depth to search (default:
+                       _MAX_DOWNWARD_DEPTH).
+
+        Returns:
+            str or None: Resolved python executable path, or None.
+        """
+        if max_depth is None:
+            max_depth = _MAX_DOWNWARD_DEPTH
+
+        start_path = os.path.realpath(start_path)
+        best_python = None
+        best_depth = max_depth + 1  # Sentinel: higher than any valid depth
+
+        for dirpath, dirnames, _files in os.walk(start_path):
+            # Calculate current depth relative to start
+            rel = os.path.relpath(dirpath, start_path)
+            depth = 0 if rel == "." else rel.count(os.sep) + 1
+
+            if depth >= max_depth:
+                dirnames.clear()  # Prune further descent
+                continue
+
+            for name in _VENV_DIR_NAMES:
+                if name in dirnames:
+                    candidate = os.path.join(dirpath, name)
+                    python_path = self._is_valid_virtualenv(candidate)
+                    if python_path:
+                        candidate_depth = depth + 1
+                        if candidate_depth < best_depth:
+                            best_depth = candidate_depth
+                            best_python = python_path
+                            logger.debug(
+                                "Downward search: found virtualenv at %s "
+                                "(depth %d)",
+                                candidate,
+                                candidate_depth,
+                            )
+
+        return best_python
+
     def detect_python_path(self):
         """Detect the active Python interpreter path.
 
-        Uses sys.executable. Notes if inside a virtual environment.
+        Uses a strict priority-based strategy:
+
+        1. **Interpreter state** — if the current process is running
+           inside a virtualenv (sys.prefix != sys.base_prefix), return
+           sys.executable directly (highest confidence).
+
+        2. **VIRTUAL_ENV environment variable** — resolve the env var
+           to ``<VIRTUAL_ENV>/bin/python`` and validate.
+
+        3. **Upward filesystem search** — traverse from project_path
+           toward the root, checking for well-known virtualenv directory
+           names (.venv, venv, env, .env) and validating each with
+           ``pyvenv.cfg`` + executable presence.
+
+        4. **Downward filesystem search** — walk project directory with
+           a controlled depth limit, looking for virtualenv directories.
 
         Returns:
-            str or None
+            str (resolved python executable path) or None
         """
-        python_path = sys.executable
-        if not python_path or not os.path.isfile(python_path):
-            return None
-        return os.path.realpath(python_path)
+        project_path = os.path.realpath(
+            self._project_path or os.getcwd()
+        )
+
+        # --- Strategy 1: Interpreter state (highest confidence) ---
+        if sys.prefix != sys.base_prefix:
+            exe = sys.executable
+            if exe and self._is_valid_executable(exe):
+                resolved = os.path.realpath(exe)
+                logger.debug(
+                    "Strategy 1 (interpreter state): running inside "
+                    "virtualenv, using sys.executable = %s",
+                    resolved,
+                )
+                return resolved
+
+        # --- Strategy 2: VIRTUAL_ENV environment variable ---
+        virtual_env = os.environ.get("VIRTUAL_ENV")
+        if virtual_env:
+            candidate = os.path.join(virtual_env, "bin", "python")
+            if self._is_valid_executable(candidate):
+                resolved = os.path.realpath(candidate)
+                logger.debug(
+                    "Strategy 2 (VIRTUAL_ENV env var): found python "
+                    "at %s",
+                    resolved,
+                )
+                return resolved
+            else:
+                logger.debug(
+                    "Strategy 2 (VIRTUAL_ENV env var): VIRTUAL_ENV=%s "
+                    "set but %s is not a valid executable, skipping",
+                    virtual_env,
+                    candidate,
+                )
+
+        # --- Strategy 3: Upward filesystem search (primary) ---
+        upward_result = self._search_upward_for_venv(project_path)
+        if upward_result:
+            logger.debug(
+                "Strategy 3 (upward search): resolved python = %s",
+                upward_result,
+            )
+            return upward_result
+
+        # --- Strategy 4: Downward filesystem search (secondary) ---
+        downward_result = self._search_downward_for_venv(project_path)
+        if downward_result:
+            logger.debug(
+                "Strategy 4 (downward search): resolved python = %s",
+                downward_result,
+            )
+            return downward_result
+
+        # --- No virtualenv found ---
+        logger.debug(
+            "No virtualenv detected for project at %s. "
+            "You do not have any venv — please create one.",
+            project_path,
+        )
+        return None
 
     def is_virtualenv(self):
         """Check if we're running inside a virtual environment."""
