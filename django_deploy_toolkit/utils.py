@@ -1,4 +1,4 @@
-"""Shared utilities for django-deploy-kit."""
+"""Shared utilities for django-deploy-toolkit."""
 
 import os
 import platform
@@ -13,7 +13,7 @@ def check_platform():
     current = platform.system().lower()
     if current != "linux":
         raise SystemExit(
-            f"django-deploy-kit only supports Linux (Ubuntu/Debian). "
+            f"django-deploy-toolkit only supports Linux (Ubuntu/Debian). "
             f"Detected OS: {platform.system()}. Exiting."
         )
 

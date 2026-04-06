@@ -1,4 +1,4 @@
-"""Rollback and cleanup logic for django-deploy-kit."""
+"""Rollback and cleanup logic for django-deploy-toolkit."""
 
 import os
 import shutil
@@ -21,7 +21,7 @@ class RollbackManager:
     def __init__(self, dry_run=False):
         self.dry_run = dry_run
         self._undo_actions = []
-        self._backup_dir = tempfile.mkdtemp(prefix="django_deploy_kit_backup_")
+        self._backup_dir = tempfile.mkdtemp(prefix="django_deploy_toolkit_backup_")
         self._backups = {}
 
     def register_file_creation(self, path):

@@ -4,7 +4,7 @@ from unittest import mock
 
 from click.testing import CliRunner
 
-from django_deploy_kit.cli import main
+from django_deploy_toolkit.cli import main
 
 
 class TestCLIHelp:
@@ -14,7 +14,7 @@ class TestCLIHelp:
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
-        assert "django-deploy-kit" in result.output
+        assert "django-deploy-toolkit" in result.output
 
     def test_version(self):
         runner = CliRunner()
@@ -26,15 +26,15 @@ class TestCLIHelp:
         runner = CliRunner()
         result = runner.invoke(main, [])
         assert result.exit_code == 0
-        assert "django-deploy-kit" in result.output
+        assert "django-deploy-toolkit" in result.output
 
 
 class TestDetectCommand:
     """Tests for the detect command."""
 
-    @mock.patch("django_deploy_kit.cli.check_platform")
-    @mock.patch("django_deploy_kit.cli.Reporter")
-    @mock.patch("django_deploy_kit.cli.ProjectDetector")
+    @mock.patch("django_deploy_toolkit.cli.check_platform")
+    @mock.patch("django_deploy_toolkit.cli.Reporter")
+    @mock.patch("django_deploy_toolkit.cli.ProjectDetector")
     def test_detect_runs(self, mock_detector_cls, mock_reporter_cls, mock_platform):
         mock_detector = mock.MagicMock()
         mock_detector.detect_all.return_value = {
@@ -63,9 +63,9 @@ class TestDetectCommand:
 class TestGenerateCommand:
     """Tests for the generate command."""
 
-    @mock.patch("django_deploy_kit.cli.check_platform")
-    @mock.patch("django_deploy_kit.cli.ConfigValidator")
-    @mock.patch("django_deploy_kit.cli.ProjectDetector")
+    @mock.patch("django_deploy_toolkit.cli.check_platform")
+    @mock.patch("django_deploy_toolkit.cli.ConfigValidator")
+    @mock.patch("django_deploy_toolkit.cli.ProjectDetector")
     def test_generate_creates_files(self, mock_detector_cls, mock_validator_cls, mock_platform, tmp_path):
         config = {
             "project_name": "test",
@@ -102,13 +102,13 @@ class TestGenerateCommand:
 class TestSetupCommand:
     """Tests for the setup command."""
 
-    @mock.patch("django_deploy_kit.cli.check_platform")
-    @mock.patch("django_deploy_kit.cli.Installer")
-    @mock.patch("django_deploy_kit.cli.ConfigValidator")
-    @mock.patch("django_deploy_kit.cli.ProjectDetector")
-    @mock.patch("django_deploy_kit.cli.check_systemd_available", return_value=True)
-    @mock.patch("django_deploy_kit.cli.check_nginx_installed", return_value=True)
-    @mock.patch("django_deploy_kit.cli.check_gunicorn_installed", return_value=True)
+    @mock.patch("django_deploy_toolkit.cli.check_platform")
+    @mock.patch("django_deploy_toolkit.cli.Installer")
+    @mock.patch("django_deploy_toolkit.cli.ConfigValidator")
+    @mock.patch("django_deploy_toolkit.cli.ProjectDetector")
+    @mock.patch("django_deploy_toolkit.cli.check_systemd_available", return_value=True)
+    @mock.patch("django_deploy_toolkit.cli.check_nginx_installed", return_value=True)
+    @mock.patch("django_deploy_toolkit.cli.check_gunicorn_installed", return_value=True)
     def test_setup_dry_run(
         self, mock_gunicorn, mock_nginx, mock_systemd,
         mock_detector_cls, mock_validator_cls, mock_installer_cls, mock_platform
@@ -146,13 +146,13 @@ class TestSetupCommand:
         result = runner.invoke(main, ["--no-confirm", "setup", "--dry-run"])
         assert result.exit_code == 0
 
-    @mock.patch("django_deploy_kit.cli.check_platform")
-    @mock.patch("django_deploy_kit.cli.Installer")
-    @mock.patch("django_deploy_kit.cli.ConfigValidator")
-    @mock.patch("django_deploy_kit.cli.ProjectDetector")
-    @mock.patch("django_deploy_kit.cli.check_systemd_available", return_value=False)
-    @mock.patch("django_deploy_kit.cli.check_nginx_installed", return_value=False)
-    @mock.patch("django_deploy_kit.cli.check_gunicorn_installed", return_value=True)
+    @mock.patch("django_deploy_toolkit.cli.check_platform")
+    @mock.patch("django_deploy_toolkit.cli.Installer")
+    @mock.patch("django_deploy_toolkit.cli.ConfigValidator")
+    @mock.patch("django_deploy_toolkit.cli.ProjectDetector")
+    @mock.patch("django_deploy_toolkit.cli.check_systemd_available", return_value=False)
+    @mock.patch("django_deploy_toolkit.cli.check_nginx_installed", return_value=False)
+    @mock.patch("django_deploy_toolkit.cli.check_gunicorn_installed", return_value=True)
     def test_setup_with_warnings(
         self, mock_gunicorn, mock_nginx, mock_systemd,
         mock_detector_cls, mock_validator_cls, mock_installer_cls, mock_platform
@@ -194,7 +194,7 @@ class TestSetupCommand:
 class TestRollbackCommand:
     """Tests for the rollback command."""
 
-    @mock.patch("django_deploy_kit.cli.check_platform")
+    @mock.patch("django_deploy_toolkit.cli.check_platform")
     @mock.patch("os.path.exists", return_value=False)
     @mock.patch("os.path.islink", return_value=False)
     def test_rollback_no_files(self, mock_islink, mock_exists, mock_platform):

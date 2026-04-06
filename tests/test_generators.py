@@ -4,9 +4,9 @@ import os
 
 import pytest
 
-from django_deploy_kit.generators.socket import SocketGenerator
-from django_deploy_kit.generators.service import ServiceGenerator
-from django_deploy_kit.generators.nginx import NginxGenerator
+from django_deploy_toolkit.generators.socket import SocketGenerator
+from django_deploy_toolkit.generators.service import ServiceGenerator
+from django_deploy_toolkit.generators.nginx import NginxGenerator
 
 
 @pytest.fixture

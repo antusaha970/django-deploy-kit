@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from django_deploy_kit.rollback import RollbackManager
+from django_deploy_toolkit.rollback import RollbackManager
 
 
 class TestRollbackRegistration:
@@ -115,8 +115,8 @@ class TestRollbackExecution:
         with open(str(test_file)) as f:
             assert f.read() == "original nginx config"
 
-    @mock.patch("django_deploy_kit.rollback.run_system_command")
-    @mock.patch("django_deploy_kit.rollback.is_root", return_value=True)
+    @mock.patch("django_deploy_toolkit.rollback.run_system_command")
+    @mock.patch("django_deploy_toolkit.rollback.is_root", return_value=True)
     def test_rollback_stops_services(self, mock_root, mock_cmd):
         rm = RollbackManager()
         rm.register_service_start("test.socket")
@@ -128,8 +128,8 @@ class TestRollbackExecution:
                       if "stop" in str(c)]
         assert len(stop_calls) > 0
 
-    @mock.patch("django_deploy_kit.rollback.run_system_command")
-    @mock.patch("django_deploy_kit.rollback.is_root", return_value=True)
+    @mock.patch("django_deploy_toolkit.rollback.run_system_command")
+    @mock.patch("django_deploy_toolkit.rollback.is_root", return_value=True)
     def test_rollback_disables_services(self, mock_root, mock_cmd):
         rm = RollbackManager()
         rm.register_service_enable("test.service")
@@ -140,8 +140,8 @@ class TestRollbackExecution:
                          if "disable" in str(c)]
         assert len(disable_calls) > 0
 
-    @mock.patch("django_deploy_kit.rollback.run_system_command")
-    @mock.patch("django_deploy_kit.rollback.is_root", return_value=True)
+    @mock.patch("django_deploy_toolkit.rollback.run_system_command")
+    @mock.patch("django_deploy_toolkit.rollback.is_root", return_value=True)
     def test_rollback_daemon_reload(self, mock_root, mock_cmd):
         rm = RollbackManager()
         rm.register_daemon_reload()
@@ -152,8 +152,8 @@ class TestRollbackExecution:
                         if "daemon-reload" in str(c)]
         assert len(reload_calls) > 0
 
-    @mock.patch("django_deploy_kit.rollback.run_system_command")
-    @mock.patch("django_deploy_kit.rollback.is_root", return_value=True)
+    @mock.patch("django_deploy_toolkit.rollback.run_system_command")
+    @mock.patch("django_deploy_toolkit.rollback.is_root", return_value=True)
     def test_rollback_nginx_reload(self, mock_root, mock_cmd):
         rm = RollbackManager()
         rm.register_nginx_reload()

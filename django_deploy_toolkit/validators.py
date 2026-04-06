@@ -1,4 +1,4 @@
-"""Input validation and interactive prompting for django-deploy-kit."""
+"""Input validation and interactive prompting for django-deploy-toolkit."""
 
 import grp
 import ipaddress

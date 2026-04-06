@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from django_deploy_kit.utils import (
+from django_deploy_toolkit.utils import (
     check_platform,
     check_systemd_available,
     check_nginx_installed,
@@ -23,16 +23,16 @@ from django_deploy_kit.utils import (
 class TestCheckPlatform:
     """Tests for platform checking."""
 
-    @mock.patch("django_deploy_kit.utils.platform.system", return_value="Linux")
+    @mock.patch("django_deploy_toolkit.utils.platform.system", return_value="Linux")
     def test_linux_passes(self, mock_sys):
         check_platform()  # Should not raise
 
-    @mock.patch("django_deploy_kit.utils.platform.system", return_value="Windows")
+    @mock.patch("django_deploy_toolkit.utils.platform.system", return_value="Windows")
     def test_windows_fails(self, mock_sys):
         with pytest.raises(SystemExit, match="only supports Linux"):
             check_platform()
 
-    @mock.patch("django_deploy_kit.utils.platform.system", return_value="Darwin")
+    @mock.patch("django_deploy_toolkit.utils.platform.system", return_value="Darwin")
     def test_macos_fails(self, mock_sys):
         with pytest.raises(SystemExit, match="only supports Linux"):
             check_platform()
@@ -119,8 +119,8 @@ class TestRunSystemCommand:
         with pytest.raises(RuntimeError, match="timed out"):
             run_system_command(["sleep", "999"])
 
-    @mock.patch("django_deploy_kit.utils.is_root", return_value=False)
-    @mock.patch("django_deploy_kit.utils.check_sudo_available", return_value=True)
+    @mock.patch("django_deploy_toolkit.utils.is_root", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.check_sudo_available", return_value=True)
     @mock.patch("subprocess.run")
     def test_sudo_prepended(self, mock_run, mock_sudo, mock_root):
         mock_run.return_value = mock.MagicMock(returncode=0)
@@ -129,8 +129,8 @@ class TestRunSystemCommand:
         call_args = mock_run.call_args[0][0]
         assert call_args[0] == "sudo"
 
-    @mock.patch("django_deploy_kit.utils.is_root", return_value=False)
-    @mock.patch("django_deploy_kit.utils.check_sudo_available", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.is_root", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.check_sudo_available", return_value=False)
     def test_no_sudo_raises(self, mock_sudo, mock_root):
         with pytest.raises(RuntimeError, match="sudo is not available"):
             run_system_command(["test"], use_sudo=True)
@@ -208,8 +208,8 @@ class TestWriteFileSafe:
         write_file_safe(path, "hello")
         assert os.path.exists(path)
 
-    @mock.patch("django_deploy_kit.utils.is_root", return_value=False)
-    @mock.patch("django_deploy_kit.utils.check_sudo_available", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.is_root", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.check_sudo_available", return_value=False)
     def test_sudo_no_sudo_available(self, mock_sudo, mock_root, tmp_path):
         path = str(tmp_path / "test.txt")
         with pytest.raises(RuntimeError, match="sudo is not available"):

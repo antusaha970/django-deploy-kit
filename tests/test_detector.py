@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from django_deploy_kit.detector import ProjectDetector
+from django_deploy_toolkit.detector import ProjectDetector
 
 
 class TestDetectProjectName:
@@ -245,7 +245,7 @@ class TestDetectPythonPath:
         fake_exe = tmp_path / "fake_python"
         fake_exe.write_text("#!/bin/sh\n")
         fake_exe.chmod(0o755)
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/some/venv"
             mock_sys.base_prefix = "/usr"
             mock_sys.executable = str(fake_exe)
@@ -255,7 +255,7 @@ class TestDetectPythonPath:
     def test_strategy1_not_in_virtualenv_skips(self, tmp_path):
         """When NOT inside a virtualenv, strategy 1 is skipped."""
         detector = ProjectDetector(project_path=str(tmp_path))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             mock_sys.executable = "/usr/bin/python3"
@@ -272,7 +272,7 @@ class TestDetectPythonPath:
         self._make_venv(venv)
 
         detector = ProjectDetector(project_path=str(tmp_path))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(
@@ -285,7 +285,7 @@ class TestDetectPythonPath:
     def test_strategy2_invalid_virtual_env(self, tmp_path):
         """VIRTUAL_ENV set but points to broken path — falls through."""
         detector = ProjectDetector(project_path=str(tmp_path))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(
@@ -302,7 +302,7 @@ class TestDetectPythonPath:
         self._make_venv(venv)
 
         detector = ProjectDetector(project_path=str(tmp_path))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(os.environ, {}, clear=True):
@@ -318,7 +318,7 @@ class TestDetectPythonPath:
         sub.mkdir()
 
         detector = ProjectDetector(project_path=str(sub))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(os.environ, {}, clear=True):
@@ -338,7 +338,7 @@ class TestDetectPythonPath:
         self._make_venv(project_venv)
 
         detector = ProjectDetector(project_path=str(project))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(os.environ, {}, clear=True):
@@ -365,7 +365,7 @@ class TestDetectPythonPath:
         self._make_venv(inner_venv)
 
         detector = ProjectDetector(project_path=str(project))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(os.environ, {}, clear=True):
@@ -378,7 +378,7 @@ class TestDetectPythonPath:
     def test_no_venv_returns_none(self, tmp_path):
         """When no virtualenv exists anywhere, return None."""
         detector = ProjectDetector(project_path=str(tmp_path))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(os.environ, {}, clear=True):
@@ -394,7 +394,7 @@ class TestDetectPythonPath:
         # No pyvenv.cfg, no bin/python
 
         detector = ProjectDetector(project_path=str(tmp_path))
-        with mock.patch("django_deploy_kit.detector.sys") as mock_sys:
+        with mock.patch("django_deploy_toolkit.detector.sys") as mock_sys:
             mock_sys.prefix = "/usr"
             mock_sys.base_prefix = "/usr"
             with mock.patch.dict(os.environ, {}, clear=True):
@@ -405,7 +405,7 @@ class TestDetectPythonPath:
 class TestDetectServerIp:
     """Tests for server IP detection via ipify API."""
 
-    @mock.patch("django_deploy_kit.detector.urllib.request.urlopen")
+    @mock.patch("django_deploy_toolkit.detector.urllib.request.urlopen")
     def test_returns_ip_from_ipify(self, mock_urlopen):
         """Successful ipify response returns the IP."""
         mock_resp = mock.MagicMock()
@@ -419,7 +419,7 @@ class TestDetectServerIp:
         assert ip == "203.0.113.42"
 
     @mock.patch(
-        "django_deploy_kit.detector.urllib.request.urlopen",
+        "django_deploy_toolkit.detector.urllib.request.urlopen",
         side_effect=OSError("no network"),
     )
     def test_fallback_to_underscore_on_error(self, mock_urlopen):
@@ -428,7 +428,7 @@ class TestDetectServerIp:
         ip = detector.detect_server_ip()
         assert ip == "_"
 
-    @mock.patch("django_deploy_kit.detector.urllib.request.urlopen")
+    @mock.patch("django_deploy_toolkit.detector.urllib.request.urlopen")
     def test_fallback_on_bad_json(self, mock_urlopen):
         """When ipify returns invalid JSON, return '_'."""
         mock_resp = mock.MagicMock()

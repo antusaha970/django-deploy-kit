@@ -1,10 +1,10 @@
-# Agent Prompt: Build `django-deploy-kit` Python Package
+# Agent Prompt: Build `django-deploy-toolkit` Python Package
 
 ---
 
 ## 🎯 Mission
 
-Build a production-grade Python package called **`django-deploy-kit`** that automatically generates and installs Gunicorn socket files, systemd service files, and Nginx configuration files for Django projects on Ubuntu/Debian Linux servers. The package must auto-detect all required values, handle every edge case gracefully, and be publishable to PyPI as open-source software.
+Build a production-grade Python package called **`django-deploy-toolkit`** that automatically generates and installs Gunicorn socket files, systemd service files, and Nginx configuration files for Django projects on Ubuntu/Debian Linux servers. The package must auto-detect all required values, handle every edge case gracefully, and be publishable to PyPI as open-source software.
 
 ---
 
@@ -13,8 +13,8 @@ Build a production-grade Python package called **`django-deploy-kit`** that auto
 Set up the complete project structure exactly as follows:
 
 ```
-django-deploy-kit/
-├── django_deploy_kit/
+django-deploy-toolkit/
+├── django_deploy_toolkit/
 │   ├── __init__.py
 │   ├── cli.py                  # Entry point (Click-based CLI)
 │   ├── detector.py             # Auto-detection logic
@@ -60,7 +60,7 @@ Set the CLI entry point in `pyproject.toml`:
 
 ```toml
 [project.scripts]
-django-deploy = "django_deploy_kit.cli:main"
+django-deploy = "django_deploy_toolkit.cli:main"
 ```
 
 Minimum Python version: `3.8`. Target platforms: Linux only. Enforce this at runtime — raise a clear `SystemExit` with a message if run on Windows or macOS.
@@ -296,7 +296,7 @@ Write a complete `README.md` with these sections:
 
 1. **What it does** — one paragraph overview
 2. **Requirements** — Ubuntu/Debian, Python 3.8+, Django project with `manage.py`, Gunicorn installed in the project's virtualenv
-3. **Installation** — `pip install django-deploy-kit`
+3. **Installation** — `pip install django-deploy-toolkit`
 4. **Quick start** — `cd /path/to/django/project && django-deploy setup`
 5. **What gets auto-detected** — a table of every detected value with the method used
 6. **Dry-run mode** — example output
@@ -348,7 +348,7 @@ Ensure the code handles all of the following without crashing, instead giving a 
 
 The package is complete when:
 
-- `pip install django-deploy-kit` works from TestPyPI
+- `pip install django-deploy-toolkit` works from TestPyPI
 - Running `django-deploy setup` in a real Django project directory on Ubuntu correctly generates all three config files, removes the default Nginx config, installs and symlinks the generated configs, and starts the services
 - `django-deploy setup --dry-run` prints every action without making any changes
 - All tests pass with `pytest` and coverage is above 80%

@@ -3,14 +3,17 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "django-deploy-kit"
+name = "django-deploy-toolkit"
 version = "0.1.0"
 description = "Auto-generate and install Gunicorn & Nginx configuration for Django projects on Ubuntu/Debian."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
 authors = [
-    { name = "django-deploy-kit contributors" },
+    { name = "Antu Saha" },
+]
+maintainers = [
+    { name = "Antu Saha" },
 ]
 keywords = [
     "django",
@@ -53,23 +56,23 @@ dev = [
 ]
 
 [project.scripts]
-django-deploy = "django_deploy_kit.cli:main"
+django-deploy = "django_deploy_toolkit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/django-deploy-kit/django-deploy-kit"
-Issues = "https://github.com/django-deploy-kit/django-deploy-kit/issues"
-Documentation = "https://github.com/django-deploy-kit/django-deploy-kit#readme"
-Changelog = "https://github.com/django-deploy-kit/django-deploy-kit/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/antusaha970/django-deploy-toolkit"
+Issues = "https://github.com/antusaha970/django-deploy-toolkit/issues"
+Documentation = "https://github.com/antusaha970/django-deploy-toolkit#readme"
+Changelog = "https://github.com/antusaha970/django-deploy-toolkit/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
-include = ["django_deploy_kit*"]
+include = ["django_deploy_toolkit*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
 [tool.coverage.run]
-source = ["django_deploy_kit"]
+source = ["django_deploy_toolkit"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

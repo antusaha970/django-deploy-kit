@@ -1,4 +1,4 @@
-"""Summary report and colored output for django-deploy-kit."""
+"""Summary report and colored output for django-deploy-toolkit."""
 
 import sys
 
@@ -10,7 +10,7 @@ console = Console()
 
 
 class Reporter:
-    """Produces rich terminal output for django-deploy-kit operations."""
+    """Produces rich terminal output for django-deploy-toolkit operations."""
 
     def __init__(self, config, sources=None):
         """

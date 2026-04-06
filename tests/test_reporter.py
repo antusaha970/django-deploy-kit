@@ -4,7 +4,7 @@ from unittest import mock
 
 from rich.console import Console
 
-from django_deploy_kit.reporter import Reporter
+from django_deploy_toolkit.reporter import Reporter
 
 
 def _make_config():
@@ -112,16 +112,16 @@ class TestReporterPanels:
 class TestReporterDetection:
     """Tests for detection results display."""
 
-    @mock.patch("django_deploy_kit.utils.check_gunicorn_installed", return_value=True)
-    @mock.patch("django_deploy_kit.utils.check_nginx_installed", return_value=True)
-    @mock.patch("django_deploy_kit.utils.check_systemd_available", return_value=True)
+    @mock.patch("django_deploy_toolkit.utils.check_gunicorn_installed", return_value=True)
+    @mock.patch("django_deploy_toolkit.utils.check_nginx_installed", return_value=True)
+    @mock.patch("django_deploy_toolkit.utils.check_systemd_available", return_value=True)
     def test_print_detection_results_all_good(self, mock_sd, mock_nginx, mock_gunicorn):
         reporter = Reporter(_make_config(), _make_sources())
         reporter.print_detection_results()
 
-    @mock.patch("django_deploy_kit.utils.check_gunicorn_installed", return_value=False)
-    @mock.patch("django_deploy_kit.utils.check_nginx_installed", return_value=False)
-    @mock.patch("django_deploy_kit.utils.check_systemd_available", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.check_gunicorn_installed", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.check_nginx_installed", return_value=False)
+    @mock.patch("django_deploy_toolkit.utils.check_systemd_available", return_value=False)
     def test_print_detection_results_all_missing(self, mock_sd, mock_nginx, mock_gunicorn):
         reporter = Reporter(_make_config(), _make_sources())
         reporter.print_detection_results()

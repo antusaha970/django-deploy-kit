@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from django_deploy_kit.validators import ConfigValidator
+from django_deploy_toolkit.validators import ConfigValidator
 
 
 @pytest.fixture

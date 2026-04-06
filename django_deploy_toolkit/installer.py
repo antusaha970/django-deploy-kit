@@ -1,4 +1,4 @@
-"""Installer / setup engine for django-deploy-kit."""
+"""Installer / setup engine for django-deploy-toolkit."""
 
 import os
 import time

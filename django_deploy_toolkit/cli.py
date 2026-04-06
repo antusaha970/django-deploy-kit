@@ -1,4 +1,4 @@
-"""Click-based CLI for django-deploy-kit."""
+"""Click-based CLI for django-deploy-toolkit."""
 
 import logging
 import os
@@ -34,11 +34,11 @@ def _configure_logging(verbose):
         format="%(levelname)s [%(name)s] %(message)s",
         force=True,
     )
-    logging.getLogger("django_deploy_kit").setLevel(log_level)
+    logging.getLogger("django_deploy_toolkit").setLevel(log_level)
 
 
 @click.group(invoke_without_command=True)
-@click.version_option(version=__version__, prog_name="django-deploy-kit")
+@click.version_option(version=__version__, prog_name="django-deploy-toolkit")
 @click.option(
     "--project-path",
     type=click.Path(exists=True, file_okay=False),
@@ -64,7 +64,7 @@ def _configure_logging(verbose):
 )
 @click.pass_context
 def main(ctx, project_path, project_name, no_confirm, verbose):
-    """django-deploy-kit: Auto-generate Gunicorn & Nginx configs for Django projects."""
+    """django-deploy-toolkit: Auto-generate Gunicorn & Nginx configs for Django projects."""
     _configure_logging(verbose)
     check_platform()
 
@@ -101,7 +101,7 @@ def setup(ctx, dry_run, verbose):
     no_confirm = ctx.obj["no_confirm"]
 
     console.print(
-        "\n[bold cyan]🚀 django-deploy-kit — Setup[/bold cyan]\n"
+        "\n[bold cyan]🚀 django-deploy-toolkit — Setup[/bold cyan]\n"
     )
 
     # --- Pre-flight checks ---
@@ -215,7 +215,7 @@ def detect(ctx, verbose):
     project_path = ctx.obj["project_path"]
 
     console.print(
-        "\n[bold cyan]🔍 django-deploy-kit — Detection[/bold cyan]\n"
+        "\n[bold cyan]🔍 django-deploy-toolkit — Detection[/bold cyan]\n"
     )
 
     detector = ProjectDetector(project_path=project_path)
@@ -252,7 +252,7 @@ def generate(ctx, output_dir, verbose):
     no_confirm = ctx.obj["no_confirm"]
 
     console.print(
-        "\n[bold cyan]📝 django-deploy-kit — Generate[/bold cyan]\n"
+        "\n[bold cyan]📝 django-deploy-toolkit — Generate[/bold cyan]\n"
     )
 
     # --- Detection ---
@@ -308,7 +308,7 @@ def rollback(ctx, name):
     no_confirm = ctx.obj["no_confirm"]
 
     console.print(
-        f"\n[bold red]🔄 django-deploy-kit — Rollback for '{name}'[/bold red]\n"
+        f"\n[bold red]🔄 django-deploy-toolkit — Rollback for '{name}'[/bold red]\n"
     )
 
     socket_path = f"/etc/systemd/system/{name}.socket"

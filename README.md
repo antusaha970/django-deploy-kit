@@ -1,8 +1,16 @@
-# django-deploy-kit
+# django-deploy-toolkit
 
 **Auto-generate and install Gunicorn & Nginx configuration for Django projects on Ubuntu/Debian.**
 
-`django-deploy-kit` detects your Django project's configuration, generates production-ready systemd service/socket files and Nginx server blocks, and installs them — all with a single command. It handles edge cases gracefully, supports dry-run mode, and includes full rollback on failure.
+`django-deploy-toolkit` detects your Django project's configuration, generates production-ready systemd service/socket files and Nginx server blocks, and installs them — all with a single command. It handles edge cases gracefully, supports dry-run mode, and includes full rollback on failure.
+
+---
+
+## Created By
+
+**Antu Saha** — creator and lead maintainer of this package.
+
+We also appreciate all the open-source contributors who help improve `django-deploy-toolkit`. Contributions of any kind are welcome — bug reports, feature requests, documentation improvements, and code contributions. See the [Contributing](#contributing) section below to get started.
 
 ---
 
@@ -20,14 +28,14 @@
 ## Installation
 
 ```bash
-pip install django-deploy-kit
+pip install django-deploy-toolkit
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/antusaha970/django-deploy-kit.git
-cd django-deploy-kit
+git clone https://github.com/antusaha970/django-deploy-toolkit.git
+cd django-deploy-toolkit
 pip install -e .
 ```
 
@@ -83,7 +91,7 @@ django-deploy setup --dry-run
 Example output:
 
 ```
-🚀 django-deploy-kit — Setup
+🚀 django-deploy-toolkit — Setup
 
   [DRY RUN] Would write: /etc/systemd/system/myproject.socket
   [DRY RUN] Would write: /etc/systemd/system/myproject.service
@@ -192,7 +200,7 @@ server {
 
 ## Default Nginx Config Removal
 
-During installation, `django-deploy-kit` removes the default Nginx configuration files:
+During installation, `django-deploy-toolkit` removes the default Nginx configuration files:
 
 - `/etc/nginx/sites-enabled/default`
 - `/etc/nginx/sites-available/default`
@@ -209,7 +217,7 @@ During installation, `django-deploy-kit` removes the default Nginx configuration
 
 ## Rollback
 
-If any installation step fails, `django-deploy-kit` automatically rolls back all changes:
+If any installation step fails, `django-deploy-toolkit` automatically rolls back all changes:
 
 1. Files created during the run are deleted
 2. Symlinks created during the run are removed
@@ -228,10 +236,12 @@ django-deploy rollback --name myproject
 
 ## Contributing
 
+Contributions are welcome! Whether it's a bug fix, new feature, or documentation improvement — all help is appreciated.
+
 ```bash
 # Clone the repository
-git clone https://github.com/django-deploy-kit/django-deploy-kit.git
-cd django-deploy-kit
+git clone https://github.com/antusaha970/django-deploy-toolkit.git
+cd django-deploy-toolkit
 
 # Install dev dependencies
 make install-dev
@@ -242,6 +252,13 @@ make test
 # Run tests with coverage
 make coverage
 ```
+
+---
+
+## Credits
+
+- **Antu Saha** — Creator and lead maintainer
+- All open-source contributors — Thank you for helping make this project better! 🙏
 
 ---
 
