@@ -1,6 +1,6 @@
 # django-deploy-toolkit
 
-**Auto-generate and install Gunicorn & Nginx configuration for Django projects on Ubuntu/Debian.**
+**Auto-generate and install Gunicorn, Nginx, Celery & Celery Beat configuration for Django projects on Ubuntu/Debian.**
 
 `django-deploy-toolkit` detects your Django project's configuration, generates production-ready systemd service/socket files and Nginx server blocks, and installs them — all with a single command. It handles edge cases gracefully, supports dry-run mode, and includes full rollback on failure.
 
@@ -60,6 +60,7 @@ That's it. The tool will:
 3. Generate and install the config files
 4. Enable and start the services
 5. Test and reload Nginx
+6. **Detect Celery** — if Celery is installed, it hints you to run `django-deploy celery-setup`
 
 ---
 
@@ -80,12 +81,63 @@ That's it. The tool will:
 
 ---
 
+## Celery & Celery Beat Support
+
+`django-deploy-toolkit` can also generate and install systemd service files for **Celery worker** and **Celery Beat** — keeping your background task infrastructure managed by systemd alongside Gunicorn.
+
+### What Gets Detected (Celery)
+
+| Check | Detection Method |
+|-------|-----------------|
+| **Celery installed** | `python -c "import celery"` using the project's Python |
+| **Celery app module** | Scans for `celery.py` in project packages, or `Celery(...)` instantiation |
+| **Celery Beat enabled** | `CELERY_BEAT_SCHEDULE` in settings, or `django_celery_beat` in `INSTALLED_APPS` |
+| **Broker URL** | `CELERY_BROKER_URL` / `BROKER_URL` from Django settings |
+| **Redis installed** | `redis-server` or `redis-cli` on `$PATH` |
+
+### Celery Quick Start
+
+```bash
+# After running django-deploy setup (or standalone):
+django-deploy celery-setup
+```
+
+The tool will:
+1. Auto-detect your Celery configuration
+2. Show you a summary and ask for confirmation
+3. Generate systemd service files for Celery worker (and Beat if detected)
+4. Install, enable, and start the services
+5. Remind you to adjust the worker concurrency (defaults to **1**)
+
+### Celery CLI Options
+
+```bash
+django-deploy celery-setup [OPTIONS]
+
+Options:
+  --dry-run              Show what would be done without doing it
+  --verbose / --no-verbose  Show or hide detailed output
+  --no-confirm           Skip the confirmation prompt
+  --help                 Show this message and exit
+```
+
+### Edge Cases Handled
+
+- **Redis not installed locally** — If your broker URL uses `redis://` but `redis-server` isn't found, a warning is shown. This is non-blocking because Redis may run on a remote host.
+- **Celery without Beat** — Only the worker service is generated.
+- **Beat with `django_celery_beat`** — The `--scheduler django_celery_beat.schedulers:DatabaseScheduler` flag is automatically added to the Beat service.
+- **No Celery found** — A helpful message is shown and the command exits cleanly.
+- **Celery app module not found** — The user is prompted to enter it manually.
+
+---
+
 ## Dry-Run Mode
 
 Preview everything that would happen without making any changes:
 
 ```bash
 django-deploy setup --dry-run
+django-deploy celery-setup --dry-run
 ```
 
 Example output:
@@ -133,6 +185,8 @@ django-deploy detect             # Just run detection, no install
 django-deploy generate           # Generate files to current directory
 django-deploy generate --output-dir ./configs  # Generate to a specific directory
 django-deploy rollback --name myproject        # Rollback a previous install
+django-deploy celery-setup       # Generate and install Celery systemd services
+django-deploy celery-setup --dry-run  # Preview Celery setup
 ```
 
 ---
@@ -194,6 +248,56 @@ server {
         proxy_pass http://unix:/run/myproject.sock;
     }
 }
+```
+
+### Celery Worker (`/etc/systemd/system/myproject-celery.service`)
+
+```ini
+[Unit]
+Description=Celery Worker for myproject
+After=network.target
+
+[Service]
+Type=forking
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/myproject
+ExecStart=/home/deploy/myproject/venv/bin/python -m celery -A myproject.celery worker \
+          --loglevel=info \
+          --concurrency=1 \
+          --pidfile=/run/celery/myproject-worker.pid \
+          --logfile=/var/log/celery/myproject-worker.log
+ExecStop=/bin/kill -s TERM $MAINPID
+RuntimeDirectory=celery
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Celery Beat (`/etc/systemd/system/myproject-celerybeat.service`)
+
+```ini
+[Unit]
+Description=Celery Beat Scheduler for myproject
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/myproject
+ExecStart=/home/deploy/myproject/venv/bin/python -m celery -A myproject.celery beat \
+          --loglevel=info \
+          --pidfile=/run/celery/myproject-beat.pid \
+          --logfile=/var/log/celery/myproject-beat.log \
+          --scheduler django_celery_beat.schedulers:DatabaseScheduler
+ExecStop=/bin/kill -s TERM $MAINPID
+RuntimeDirectory=celery
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ---

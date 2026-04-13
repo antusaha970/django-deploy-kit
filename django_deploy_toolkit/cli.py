@@ -13,6 +13,8 @@ from .generators.nginx import NginxGenerator
 from .generators.service import ServiceGenerator
 from .generators.socket import SocketGenerator
 from .installer import Installer
+from .celery_detector import CeleryDetector
+from .celery_installer import CeleryInstaller
 from .reporter import Reporter
 from .rollback import RollbackManager
 from .utils import (
@@ -199,6 +201,31 @@ def setup(ctx, dry_run, verbose):
             f"[green]server_name yourdomain.com;[/green]\n"
             f"   Then reload Nginx: [dim]sudo systemctl reload nginx[/dim]\n"
         )
+
+        # --- Celery hint ---
+        try:
+            celery_det = CeleryDetector(
+                project_path=config["project_path"],
+                python_path=config.get("python_path"),
+            )
+            celery_info = celery_det.detect_all()
+            has_celery = celery_info.get("celery_installed", False)
+            has_beat = celery_info.get("celery_beat_enabled", False)
+
+            if has_celery and has_beat:
+                console.print(
+                    "[bold magenta]📦 Celery & Celery Beat detected![/bold magenta]\n"
+                    "   Generate systemd services for both with:\n\n"
+                    "     [dim]django-deploy celery-setup[/dim]\n"
+                )
+            elif has_celery:
+                console.print(
+                    "[bold magenta]📦 Celery detected![/bold magenta]\n"
+                    "   Generate a systemd service for Celery worker with:\n\n"
+                    "     [dim]django-deploy celery-setup[/dim]\n"
+                )
+        except Exception:
+            pass  # Don't let celery detection failure break setup
 
 
 @main.command()
@@ -403,6 +430,194 @@ def rollback(ctx, name):
     console.print(
         f"\n[bold green]Rollback for '{name}' complete.[/bold green]\n"
     )
+
+
+@main.command(name="celery-setup")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show what would be done without actually doing it.",
+)
+@click.option(
+    "--verbose/--no-verbose",
+    default=False,
+    help="Show or hide detailed output.",
+)
+@click.pass_context
+def celery_setup(ctx, dry_run, verbose):
+    """Detect Celery/Celery Beat and generate + install systemd services."""
+    verbose = verbose or ctx.obj.get("verbose", False)
+    _configure_logging(verbose)
+    project_path = ctx.obj["project_path"]
+    project_name = ctx.obj["project_name"]
+    no_confirm = ctx.obj["no_confirm"]
+
+    console.print(
+        "\n[bold cyan]🥬 django-deploy-toolkit — Celery Setup[/bold cyan]\n"
+    )
+
+    # --- Detection (reuse Django detector for project basics) ---
+    console.print("[bold]Detecting project configuration...[/bold]\n")
+    detector = ProjectDetector(project_path=project_path)
+    config = detector.detect_all()
+
+    if project_name:
+        config["project_name"] = project_name
+    if project_path:
+        config["project_path"] = os.path.abspath(project_path)
+
+    # Validate essentials
+    if not config.get("project_path"):
+        console.print(
+            "[red]✗ Could not detect Django project path. "
+            "Run this command from your Django project root "
+            "(where manage.py lives).[/red]"
+        )
+        raise SystemExit(1)
+
+    if not config.get("python_path"):
+        console.print(
+            "[red]✗ Could not detect Python interpreter. "
+            "Activate your project's virtual environment and "
+            "try again.[/red]"
+        )
+        raise SystemExit(1)
+
+    # --- Celery detection ---
+    console.print("[bold]Detecting Celery configuration...[/bold]\n")
+    celery_det = CeleryDetector(
+        project_path=config["project_path"],
+        python_path=config.get("python_path"),
+    )
+    celery_info = celery_det.detect_all()
+
+    if not celery_info["celery_installed"]:
+        console.print(
+            "[yellow]Celery is not installed in this environment.[/yellow]\n"
+            "Install it with: [dim]pip install celery[/dim]\n"
+        )
+        raise SystemExit(0)
+
+    if not celery_info["celery_app_module"]:
+        console.print(
+            "[yellow]⚠ Could not auto-detect Celery app module.[/yellow]"
+        )
+        celery_app_module = click.prompt(
+            "Celery app module (e.g. myproject.celery)",
+            type=str,
+        )
+    else:
+        celery_app_module = celery_info["celery_app_module"]
+        console.print(
+            f"  Celery app module: [green]{celery_app_module}[/green]"
+        )
+
+    has_beat = celery_info["celery_beat_enabled"]
+    has_django_beat = celery_info["django_celery_beat_installed"]
+    broker_url = celery_info["broker_url"]
+    broker_is_redis = celery_info["broker_is_redis"]
+    redis_installed = celery_info["redis_installed"]
+
+    # --- Print summary ---
+    console.print(f"  Celery installed:   [green]Yes[/green]")
+    console.print(
+        f"  Celery Beat:        "
+        f"{'[green]Yes[/green]' if has_beat else '[dim]No[/dim]'}"
+    )
+    if broker_url:
+        console.print(f"  Broker URL:         [cyan]{broker_url}[/cyan]")
+    if has_django_beat:
+        console.print(
+            f"  django_celery_beat: [green]Installed[/green] "
+            f"(will use DatabaseScheduler)"
+        )
+
+    # --- Redis warning ---
+    if broker_is_redis and not redis_installed:
+        console.print(
+            "\n[yellow]⚠ Your broker uses Redis, but redis-server was "
+            "not found on this system.[/yellow]\n"
+            "  If Redis is running on a remote host, you can ignore "
+            "this warning.\n"
+            "  Otherwise, install Redis: [dim]sudo apt install "
+            "redis-server[/dim]\n"
+        )
+
+    # --- What will be generated ---
+    pname = config["project_name"]
+    console.print("\n[bold]The following systemd services will be created:[/bold]")
+    console.print(f"  • /etc/systemd/system/{pname}-celery.service")
+    if has_beat:
+        console.print(
+            f"  • /etc/systemd/system/{pname}-celerybeat.service"
+        )
+    console.print()
+
+    if not no_confirm:
+        if not click.confirm("Proceed?", default=True):
+            console.print("[dim]Celery setup cancelled.[/dim]")
+            raise SystemExit(0)
+
+    # --- Build installer config ---
+    install_config = {
+        "project_name": config["project_name"],
+        "project_path": config["project_path"],
+        "python_path": config["python_path"],
+        "user": config["user"],
+        "group": config["group"],
+        "celery_app_module": celery_app_module,
+        "concurrency": 1,
+        "use_django_celery_beat": has_django_beat,
+    }
+
+    # --- Install ---
+    installer = CeleryInstaller(
+        install_config,
+        install_beat=has_beat,
+        dry_run=dry_run,
+        overwrite=False,
+    )
+    results = installer.install()
+
+    # --- Results ---
+    reporter = Reporter(config, {})
+    reporter.print_results_table(results)
+
+    failed = [r for r in results if r[1] == "failed"]
+    if failed:
+        failed_step = failed[0][0]
+        error = failed[0][2]
+        reporter.print_failure(error, failed_step)
+        raise SystemExit(1)
+
+    if dry_run:
+        console.print(
+            "[bold yellow]Dry run complete. "
+            "No changes were made.[/bold yellow]\n"
+        )
+    else:
+        console.print(
+            f"[bold green]✓ Celery services for '{pname}' are now "
+            f"active.[/bold green]\n"
+        )
+
+    # --- Post-install reminders ---
+    console.print(
+        "[bold cyan]📌 Important:[/bold cyan] Celery worker "
+        "[bold]concurrency[/bold] is set to [yellow]1[/yellow].\n"
+        "   Adjust it based on your workload:\n\n"
+        f"     [dim]sudo nano /etc/systemd/system/{pname}-celery.service[/dim]\n\n"
+        "   Change [yellow]--concurrency=1[/yellow] to a suitable value,\n"
+        "   then reload: [dim]sudo systemctl daemon-reload && "
+        f"sudo systemctl restart {pname}-celery.service[/dim]\n"
+    )
+
+    if has_beat:
+        console.print(
+            "[bold cyan]📌 Verify Celery Beat:[/bold cyan]\n"
+            f"  systemctl status {pname}-celerybeat.service\n"
+        )
 
 
 if __name__ == "__main__":
