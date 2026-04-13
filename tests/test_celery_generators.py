@@ -39,7 +39,7 @@ class TestCeleryWorkerGenerator:
         assert "Group=deploy" in content
         assert "WorkingDirectory=/home/deploy/myproject" in content
         assert "-A myproject.celery worker" in content
-        assert "Type=forking" in content
+        assert "Type=simple" in content
         assert "WantedBy=multi-user.target" in content
 
     def test_generate_custom_concurrency(self, base_config):
@@ -50,11 +50,10 @@ class TestCeleryWorkerGenerator:
 
         assert "--concurrency=4" in content
 
-    def test_generate_pid_and_log_paths(self, base_config):
+    def test_generate_log_path(self, base_config):
         gen = CeleryWorkerGenerator(base_config)
         content = gen.generate()
 
-        assert "--pidfile=/run/celery/myproject-worker.pid" in content
         assert "--logfile=/var/log/celery/myproject-worker.log" in content
 
     def test_generate_runtime_directory(self, base_config):
@@ -114,11 +113,10 @@ class TestCeleryBeatGenerator:
             in content
         )
 
-    def test_generate_pid_and_log_paths(self, base_config):
+    def test_generate_log_path(self, base_config):
         gen = CeleryBeatGenerator(base_config)
         content = gen.generate()
 
-        assert "--pidfile=/run/celery/myproject-beat.pid" in content
         assert "--logfile=/var/log/celery/myproject-beat.log" in content
 
     def test_generate_runtime_directory(self, base_config):

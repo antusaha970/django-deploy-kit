@@ -9,16 +9,14 @@ Description=Celery Worker for {{ project_name }}
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 User={{ user }}
 Group={{ group }}
 WorkingDirectory={{ project_path }}
 ExecStart={{ python_path }} -m celery -A {{ celery_app_module }} worker \\
           --loglevel=info \\
           --concurrency={{ concurrency }} \\
-          --pidfile=/run/celery/{{ project_name }}-worker.pid \\
           --logfile=/var/log/celery/{{ project_name }}-worker.log
-ExecStop=/bin/kill -s TERM $MAINPID
 RuntimeDirectory=celery
 Restart=always
 

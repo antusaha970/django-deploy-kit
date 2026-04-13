@@ -15,11 +15,9 @@ Group={{ group }}
 WorkingDirectory={{ project_path }}
 ExecStart={{ python_path }} -m celery -A {{ celery_app_module }} beat \\
           --loglevel=info \\
-          --pidfile=/run/celery/{{ project_name }}-beat.pid \\
           --logfile=/var/log/celery/{{ project_name }}-beat.log{% if use_django_celery_beat %} \\
           --scheduler django_celery_beat.schedulers:DatabaseScheduler{% endif %}
 
-ExecStop=/bin/kill -s TERM $MAINPID
 RuntimeDirectory=celery
 Restart=always
 
